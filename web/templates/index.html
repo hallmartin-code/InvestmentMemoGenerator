@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TEN Capital Network — Deck to One-Pager</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-950: #0B1526;
+    --navy-900: #101E33;
+    --navy-800: #16283F;
+    --navy-700: #1E354F;
+    --coral: #EE5A4E;
+    --coral-soft: #F0776C;
+    --amber: #F3A22A;
+    --teal: #35BEBB;
+    --ink-100: #F3F6FA;
+    --ink-300: #C4D0E0;
+    --ink-500: #7E90A8;
+    --ink-600: #5C6E86;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0;
+    padding:0;
+    background: var(--navy-950);
+    color: var(--ink-100);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 48px 20px;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* ambient tri-color glow, echoing the logo's three figures */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background:
+      radial-gradient(480px 380px at 14% 8%, rgba(238,90,78,0.16), transparent 60%),
+      radial-gradient(480px 380px at 86% 6%, rgba(243,162,42,0.13), transparent 60%),
+      radial-gradient(560px 420px at 50% 100%, rgba(53,190,187,0.14), transparent 60%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .stage{
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-width: 620px;
+  }
+
+  /* brand lockup */
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom: 28px;
+    padding-left: 4px;
+  }
+
+  .brand-mark{
+    width:34px; height:34px;
+    flex-shrink:0;
+  }
+
+  .brand-word{
+    font-family:'Sora', sans-serif;
+    font-weight:800;
+    font-size:15px;
+    letter-spacing:0.04em;
+    line-height:1.15;
+    color: var(--ink-100);
+    text-transform:uppercase;
+  }
+  .brand-word span{
+    display:block;
+    font-weight:600;
+    font-size:10px;
+    letter-spacing:0.22em;
+    color: var(--ink-500);
+    margin-top:2px;
+  }
+
+  .card{
+    background: linear-gradient(180deg, var(--navy-900) 0%, var(--navy-800) 100%);
+    border: 1px solid var(--navy-700);
+    border-radius: 20px;
+    padding: 44px 44px 36px;
+    box-shadow:
+      0 30px 60px -20px rgba(0,0,0,0.55),
+      inset 0 1px 0 rgba(255,255,255,0.03);
+    position:relative;
+    overflow:hidden;
+  }
+
+  .card::after{
+    content:"";
+    position:absolute;
+    top:-2px; left:44px; right:44px;
+    height:2px;
+    background: linear-gradient(90deg, var(--coral), var(--amber), var(--teal));
+    border-radius: 2px;
+  }
+
+  .eyebrow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color: var(--teal);
+    margin-bottom:14px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:6px; height:6px;
+    border-radius:50%;
+    background: var(--teal);
+    box-shadow: 0 0 0 3px rgba(53,190,187,0.18);
+  }
+
+  h1{
+    font-family:'Sora', sans-serif;
+    font-size: 28px;
+    font-weight:700;
+    line-height:1.25;
+    margin: 0 0 12px;
+    letter-spacing:-0.01em;
+  }
+  h1 .arrow{
+    color: var(--ink-500);
+    font-weight:400;
+    margin: 0 4px;
+  }
+  h1 .to{
+    background: linear-gradient(90deg, var(--coral-soft), var(--amber));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .lede{
+    color: var(--ink-300);
+    font-size:15px;
+    line-height:1.6;
+    margin: 0 0 32px;
+    max-width: 46ch;
+  }
+
+  /* dropzone */
+  .dropzone{
+    display:block;
+    border: 1.5px dashed var(--navy-700);
+    border-radius: 14px;
+    padding: 38px 24px;
+    text-align:center;
+    cursor:pointer;
+    background: rgba(255,255,255,0.015);
+    transition: border-color .18s ease, background .18s ease, transform .18s ease;
+  }
+  .dropzone:hover{
+    border-color: var(--teal);
+    background: rgba(53,190,187,0.05);
+  }
+  .dropzone:active{ transform: scale(0.997); }
+  .dropzone.is-dragging{
+    border-color: var(--teal);
+    background: rgba(53,190,187,0.08);
+  }
+  .dropzone.has-file{
+    border-style: solid;
+    border-color: var(--teal);
+    background: rgba(53,190,187,0.06);
+  }
+
+  .dropzone-icon{
+    width:38px; height:38px;
+    margin: 0 auto 14px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(238,90,78,0.16), rgba(243,162,42,0.16));
+    border: 1px solid var(--navy-700);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .dropzone-icon svg{ width:18px; height:18px; }
+
+  .dropzone-title{
+    font-size:15px;
+    font-weight:600;
+    color: var(--ink-100);
+    margin-bottom:6px;
+    word-break: break-all;
+  }
+  .dropzone-sub{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11.5px;
+    color: var(--ink-500);
+    letter-spacing:0.01em;
+  }
+  .dropzone-sub b{ color: var(--ink-300); font-weight:500; }
+
+  .file-input{ display:none; }
+
+  /* CTA */
+  .cta{
+    width:100%;
+    margin-top: 22px;
+    padding: 16px 20px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(90deg, var(--coral) 0%, var(--coral-soft) 45%, var(--amber) 100%);
+    color: #17130E;
+    font-family:'Sora', sans-serif;
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.01em;
+    cursor:pointer;
+    transition: filter .15s ease, transform .15s ease;
+    box-shadow: 0 10px 24px -10px rgba(238,90,78,0.45);
+  }
+  .cta:hover{ filter: brightness(1.06); transform: translateY(-1px); }
+  .cta:active{ transform: translateY(0); }
+  .cta:disabled{
+    cursor: progress;
+    filter: saturate(0.45) brightness(0.85);
+    transform:none;
+    box-shadow:none;
+  }
+
+  /* status */
+  .status{
+    display:none;
+    margin-top: 16px;
+    padding: 13px 15px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height:1.55;
+    border: 1px solid var(--navy-700);
+    background: rgba(255,255,255,0.02);
+    color: var(--ink-300);
+  }
+  .status.is-visible{ display:block; }
+  .status.is-error{
+    border-color: rgba(238,90,78,0.5);
+    background: rgba(238,90,78,0.09);
+    color: #FFD3CE;
+  }
+  .status.is-done{
+    border-color: rgba(53,190,187,0.5);
+    background: rgba(53,190,187,0.09);
+    color: #C9F3F2;
+  }
+  .status .spinner{
+    display:inline-block;
+    width:11px; height:11px;
+    margin-right:8px;
+    vertical-align:-1px;
+    border-radius:50%;
+    border:2px solid rgba(53,190,187,0.25);
+    border-top-color: var(--teal);
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  /* footnote / disclosure */
+  .disclosure{
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--navy-700);
+    font-size: 12px;
+    line-height:1.6;
+    color: var(--ink-500);
+  }
+  .disclosure code{
+    font-family:'JetBrains Mono', monospace;
+    background: var(--navy-950);
+    border: 1px solid var(--navy-700);
+    color: var(--ink-300);
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 11.5px;
+  }
+
+  footer{
+    text-align:center;
+    margin-top: 22px;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing:0.08em;
+    color: var(--ink-600);
+    text-transform:uppercase;
+  }
+
+  @media (max-width: 480px){
+    .card{ padding: 32px 24px 28px; }
+    h1{ font-size:23px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 6 C64 6 74 16 74 16" stroke="var(--amber)" stroke-width="11" stroke-linecap="round" fill="none"/>
+      <path d="M76 66 C76 82 63 92 63 92" stroke="var(--teal)" stroke-width="11" stroke-linecap="round" fill="none"/>
+      <path d="M24 66 C24 82 37 92 37 92" stroke="var(--coral)" stroke-width="11" stroke-linecap="round" fill="none"/>
+      <circle cx="50" cy="20" r="11" fill="var(--amber)"/>
+      <circle cx="78" cy="68" r="11" fill="var(--teal)"/>
+      <circle cx="22" cy="68" r="11" fill="var(--coral)"/>
+    </svg>
+    <div class="brand-word">Ten Capital<span>Network</span></div>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">Deck Analyzer</div>
+    <h1>Pitch Deck<span class="arrow">&rarr;</span><span class="to">Investor One&#8209;Pager</span></h1>
+    <p class="lede">Upload a pitch deck and get a polished single-page investor PDF, analyzed and structured by Claude.</p>
+
+    <form id="deck-form">
+      <label class="dropzone" id="dropzone" for="deck-upload">
+        <div class="dropzone-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-100)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3v4a1 1 0 0 0 1 1h4"/>
+            <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/>
+          </svg>
+        </div>
+        <div class="dropzone-title" id="dropzone-title">Click to choose a deck</div>
+        <div class="dropzone-sub" id="dropzone-sub"><b>.pptx</b> &middot; <b>.pdf</b> &middot; <b>.docx</b> &nbsp;&middot;&nbsp; up to {{ max_mb }}&nbsp;MB</div>
+        <input class="file-input" type="file" id="deck-upload" name="deck" accept="{{ accepted }}">
+      </label>
+
+      <button class="cta" type="submit" id="submit-btn">Generate one-pager PDF</button>
+    </form>
+
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+
+    <div class="disclosure">
+      The uploaded file is sent to the Anthropic API for analysis and the generated one-pager is returned to your browser. Nothing is stored on the server after the request completes.
+    </div>
+  </div>
+
+  <footer>Powered by TEN Capital Network</footer>
+
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById('deck-form');
+  const input = document.getElementById('deck-upload');
+  const dropzone = document.getElementById('dropzone');
+  const title = document.getElementById('dropzone-title');
+  const sub = document.getElementById('dropzone-sub');
+  const button = document.getElementById('submit-btn');
+  const status = document.getElementById('status');
+
+  const DEFAULT_TITLE = title.textContent;
+  const DEFAULT_SUB = sub.innerHTML;
+  const MAX_BYTES = {{ max_mb }} * 1024 * 1024;
+
+  function setStatus(html, kind) {
+    status.className = 'status is-visible' + (kind ? ' is-' + kind : '');
+    status.innerHTML = html;
+  }
+
+  function clearStatus() {
+    status.className = 'status';
+    status.innerHTML = '';
+  }
+
+  function showFile(file) {
+    title.textContent = file.name;
+    sub.textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB — click to replace';
+    dropzone.classList.add('has-file');
+  }
+
+  function resetFile() {
+    input.value = '';
+    title.textContent = DEFAULT_TITLE;
+    sub.innerHTML = DEFAULT_SUB;
+    dropzone.classList.remove('has-file');
+  }
+
+  input.addEventListener('change', function () {
+    clearStatus();
+    if (input.files.length) { showFile(input.files[0]); } else { resetFile(); }
+  });
+
+  ['dragenter', 'dragover'].forEach(function (name) {
+    dropzone.addEventListener(name, function (event) {
+      event.preventDefault();
+      dropzone.classList.add('is-dragging');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (name) {
+    dropzone.addEventListener(name, function (event) {
+      event.preventDefault();
+      dropzone.classList.remove('is-dragging');
+    });
+  });
+  dropzone.addEventListener('drop', function (event) {
+    if (event.dataTransfer.files.length) {
+      input.files = event.dataTransfer.files;
+      clearStatus();
+      showFile(input.files[0]);
+    }
+  });
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    if (!input.files.length) {
+      setStatus('Choose a deck first.', 'error');
+      return;
+    }
+    const file = input.files[0];
+    if (file.size > MAX_BYTES) {
+      setStatus('That file is larger than {{ max_mb }} MB.', 'error');
+      return;
+    }
+
+    button.disabled = true;
+    const label = button.textContent;
+    button.textContent = 'Analyzing deck…';
+    setStatus('<span class="spinner"></span>Reading the deck and drafting the memo. This usually takes 30–90 seconds.');
+
+    try {
+      const body = new FormData();
+      body.append('deck', file);
+      const response = await fetch('/generate', { method: 'POST', body: body });
+
+      if (!response.ok) {
+        let message = 'Generation failed (HTTP ' + response.status + ').';
+        try {
+          const payload = await response.json();
+          if (payload && payload.error) { message = payload.error; }
+        } catch (err) { /* non-JSON error body */ }
+        setStatus(message, 'error');
+        return;
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const name = match ? match[1] : 'memo.pdf';
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setStatus('Done — <b>' + name + '</b> has been downloaded.', 'done');
+    } catch (err) {
+      setStatus('Network error: ' + err.message, 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = label;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

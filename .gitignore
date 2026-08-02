@@ -1,0 +1,10 @@
+.env
+output/*.pdf
+
+# Fonts are user-supplied from Google Fonts, not bundled with the repo.
+fonts/*.ttf
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/

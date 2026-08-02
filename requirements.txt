@@ -1,0 +1,15 @@
+pdfplumber
+python-pptx
+python-docx
+reportlab
+Pillow
+anthropic
+python-dotenv
+
+# Web app
+Flask
+gunicorn
+
+# Instances the Sora/Inter variable fonts into the static weights ReportLab
+# needs. Used by tools/fetch_brand_fonts.py at build time.
+fonttools
