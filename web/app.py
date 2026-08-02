@@ -104,13 +104,18 @@ def generate():
         except extractor.APICallError as exc:
             return jsonify(error=str(exc)), 502
 
-        sections = writer.parse_memo_sections(memo_text)
+        sections, degraded = writer.sections_or_fallback(memo_text)
         if not sections:
             return jsonify(
-                error="Claude's memo had no section headers, so there was "
-                      "nothing to render."
+                error="Claude returned an empty memo. Try again — if it "
+                      "persists, the deck may have too little usable text."
             ), 502
-        sections = template.order_sections(sections)
+        if degraded:
+            app.logger.warning(
+                "No section headers found; rendering memo as a single block."
+            )
+        else:
+            sections = template.order_sections(sections)
 
         output = Path(workdir) / f"{Path(filename).stem}_memo.pdf"
         try:

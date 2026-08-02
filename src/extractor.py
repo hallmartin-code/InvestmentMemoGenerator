@@ -51,6 +51,21 @@ Use only the sections that apply:
 
 {sections}
 
+FORMAT
+Start every section with its header in ALL CAPS on its own line, followed by a
+colon, then the body beneath it. Exactly like this:
+
+EXECUTIVE SUMMARY:
+First paragraph of the summary.
+
+Second paragraph if the section needs one.
+
+WHAT WORKS:
+First paragraph.
+
+Do not bold the headers, do not prefix them with #, and do not number them.
+Do not write any preamble before the first header.
+
 RULES
 - Output plain text only — no markdown, no asterisks, no bullet symbols, no em-dashes for decoration
 - No citations, no footnotes, no meta-commentary

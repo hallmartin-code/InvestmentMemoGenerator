@@ -17,10 +17,56 @@ from reportlab.platypus import (
 
 import brand
 import layout
+import template
 
-# An ALL-CAPS line ending in a colon starts a new section. Body text may follow
-# on the same line or on the lines beneath it.
-SECTION_HEADER_RE = re.compile(r"^([A-Z][A-Z0-9 &'’/()\-\.]*):\s*(.*)$")
+# Header detection has to survive the surface forms models actually emit: with
+# or without a trailing colon, wrapped in **bold**, prefixed with ##, or in
+# title case. The trailing colon in particular is dropped often enough that
+# requiring it left nothing to render.
+_MD_HEADING_RE = re.compile(r"^\s*#{1,6}\s*")
+_BULLET_RE = re.compile(r"^\s*[-*•]\s+")
+_MD_EMPHASIS_RE = re.compile(r"\*\*|__|\*")
+
+# Fallback for a header the template does not define. Deliberately strict: an
+# all-caps line, no sentence punctuation, and either multi-word or long enough
+# that it cannot be a stray label like "ARR:" at the head of a body line.
+_GENERIC_HEADER_RE = re.compile(r"^[A-Z][A-Z0-9 &'’/()\-\.,]{1,59}$")
+
+
+def _looks_like_header(text):
+    text = text.strip()
+    if not _GENERIC_HEADER_RE.match(text):
+        return False
+    if text.endswith((".", ",")):
+        return False
+    return " " in text or len(text) >= 8
+
+
+def _split_header(line):
+    """Return (header, inline_body) if `line` starts a section, else None."""
+    stripped = _MD_HEADING_RE.sub("", line.strip())
+    stripped = _BULLET_RE.sub("", stripped)
+    stripped = _MD_EMPHASIS_RE.sub("", stripped).strip()
+    if not stripped:
+        return None
+
+    # "HEADER: body on the same line"
+    head, separator, tail = stripped.partition(":")
+    if separator:
+        canonical = template.match_section_name(head)
+        if canonical:
+            return canonical, tail.strip()
+        if _looks_like_header(head):
+            return head.strip(), tail.strip()
+        # A colon mid-sentence is not a section break.
+        return None
+
+    canonical = template.match_section_name(stripped)
+    if canonical:
+        return canonical, ""
+    if _looks_like_header(stripped):
+        return stripped, ""
+    return None
 
 
 def parse_memo_sections(memo_text):
@@ -34,21 +80,36 @@ def parse_memo_sections(memo_text):
     current_lines = []
 
     for line in memo_text.splitlines():
-        stripped = line.strip()
-        match = SECTION_HEADER_RE.match(stripped)
-        # Require a real header: no lowercase letters, at least two characters.
-        if match and len(match.group(1).strip()) >= 2:
+        header = _split_header(line)
+        if header is not None:
             if current_name is not None:
                 sections.append((current_name, "\n".join(current_lines).strip()))
-            current_name = match.group(1).strip()
-            current_lines = [match.group(2)] if match.group(2) else []
+            current_name, inline_body = header
+            current_lines = [inline_body] if inline_body else []
         elif current_name is not None:
-            current_lines.append(stripped)
+            current_lines.append(line.strip())
 
     if current_name is not None:
         sections.append((current_name, "\n".join(current_lines).strip()))
 
-    return sections
+    return [(name, body) for name, body in sections if body]
+
+
+def sections_or_fallback(memo_text):
+    """Parse sections, falling back to one untitled block.
+
+    Returns (sections, degraded). If Claude ignored the header format entirely
+    the prose is still worth rendering — the tokens are already spent and a
+    memo without headers beats no memo at all.
+    """
+    sections = parse_memo_sections(memo_text)
+    if sections:
+        return sections, False
+
+    body = (memo_text or "").strip()
+    if not body:
+        return [], False
+    return [("", body)], True
 
 
 def _clean(text):
@@ -196,8 +257,12 @@ def build_pdf(output_path, company_name, tagline, sections):
     for section_name, body_text in sections:
         if not body_text:
             continue
-        story.append(Paragraph(_clean(section_name.upper()), styles["SECTION_HEADER"]))
-        story.append(Spacer(1, layout.GAP_AFTER_HEADER))
+        # An empty name is the untitled fallback block — render body only.
+        if section_name:
+            story.append(
+                Paragraph(_clean(section_name.upper()), styles["SECTION_HEADER"])
+            )
+            story.append(Spacer(1, layout.GAP_AFTER_HEADER))
         for paragraph in _paragraphs(body_text):
             story.append(Paragraph(_clean(paragraph), styles["BODY"]))
         story.append(Spacer(1, layout.GAP_AFTER_SECTION))

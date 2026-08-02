@@ -89,11 +89,17 @@ def main(argv=None):
     except extractor.APICallError as exc:
         fail(str(exc))
 
-    sections = writer.parse_memo_sections(memo_text)
+    sections, degraded = writer.sections_or_fallback(memo_text)
     if not sections:
         fail(
-            "The memo response contained no ALL-CAPS section headers, so there "
-            "is nothing to render.\n--- raw memo text ---\n" + memo_text
+            "The memo response was empty, so there is nothing to render.\n"
+            "--- raw memo text ---\n" + memo_text
+        )
+    if degraded:
+        print(
+            "Note: no section headers were found in the memo, so it is being "
+            "rendered as a single block.",
+            file=sys.stderr,
         )
 
     unexpected = template.unknown_section_names(sections)

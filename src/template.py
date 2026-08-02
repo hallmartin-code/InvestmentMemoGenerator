@@ -10,6 +10,8 @@ It defines structure, not content: no company data, no example text.
 See templates/memo_structure.md for the human-readable version.
 """
 
+import re
+
 # --- Header block (page 1 only) ----------------------------------------------
 # Field name -> the extraction key it is populated from.
 
@@ -93,7 +95,32 @@ MEMO_SECTIONS = [
 ]
 
 SECTION_NAMES = [section["name"] for section in MEMO_SECTIONS]
-_SECTION_ORDER = {name: index for index, name in enumerate(SECTION_NAMES)}
+
+
+def normalize_section_name(text):
+    """Canonical key for comparing section headers.
+
+    Models vary the surface form — curly apostrophes, a trailing colon, title
+    case, stray whitespace — so comparison happens on a normalized key rather
+    than the literal string.
+    """
+    text = (text or "").replace("’", "'").replace("‘", "'")
+    text = text.replace("–", "-").replace("—", "-")
+    text = re.sub(r"[\s:]+$", "", text.strip())
+    text = re.sub(r"\s+", " ", text)
+    return text.upper()
+
+
+_SECTION_LOOKUP = {normalize_section_name(n): n for n in SECTION_NAMES}
+_SECTION_ORDER = {
+    normalize_section_name(name): index
+    for index, name in enumerate(SECTION_NAMES)
+}
+
+
+def match_section_name(text):
+    """Return the canonical section name for `text`, or None if unknown."""
+    return _SECTION_LOOKUP.get(normalize_section_name(text))
 
 
 # --- Prompt fragments generated from the definitions above -------------------
@@ -124,15 +151,22 @@ def order_sections(sections):
     Sections not in the template keep their relative position at the end
     rather than being dropped — an unexpected header is still content.
     """
-    known = [s for s in sections if s[0].upper() in _SECTION_ORDER]
-    unknown = [s for s in sections if s[0].upper() not in _SECTION_ORDER]
-    known.sort(key=lambda s: _SECTION_ORDER[s[0].upper()])
+    def rank(section):
+        return _SECTION_ORDER.get(normalize_section_name(section[0]))
+
+    known = [s for s in sections if rank(s) is not None]
+    unknown = [s for s in sections if rank(s) is None]
+    known.sort(key=rank)
     return known + unknown
 
 
 def unknown_section_names(sections):
     """Return header names that are not part of the canonical structure."""
-    return [s[0] for s in sections if s[0].upper() not in _SECTION_ORDER]
+    return [
+        s[0]
+        for s in sections
+        if s[0] and normalize_section_name(s[0]) not in _SECTION_ORDER
+    ]
 
 
 def blank_structured_data():

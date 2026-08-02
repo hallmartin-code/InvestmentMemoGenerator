@@ -106,6 +106,10 @@ this exact header and this order.
 | 6 | `RECOMMENDED NEXT STEPS` | Specific diligence actions or materials needed before this advances. | `risks`, gaps across all fields |
 | 7 | `FINAL INVESTOR TAKE` | The call — advance, request more, or pass — and the single reason behind it. | Synthesis of all above |
 
+Headers are matched case-insensitively and tolerate a missing trailing colon,
+markdown emphasis, `#` prefixes, and curly apostrophes. A memo with no
+recognisable headers renders as one untitled block.
+
 ### Section rendering
 
 ```
