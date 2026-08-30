@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <title>TEN Capital Network — Deck to One-Pager</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+<meta name="theme-color" content="#0B1526">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -353,7 +357,7 @@
     <div class="status" id="status" role="status" aria-live="polite"></div>
 
     <div class="disclosure">
-      The uploaded file is sent to the Anthropic API for analysis and the generated one-pager is returned to your browser. Nothing is stored on the server after the request completes.
+      The uploaded file is sent to the Anthropic API for analysis and the generated one-pager is returned to your browser. Nothing is stored on the server after the request completes.{% if email_to %} A copy of every memo is emailed to <code>{{ email_to }}</code>.{% endif %}
     </div>
   </div>
 
@@ -374,6 +378,12 @@
   const DEFAULT_TITLE = title.textContent;
   const DEFAULT_SUB = sub.innerHTML;
   const MAX_BYTES = {{ max_mb }} * 1024 * 1024;
+
+  function esc(text) {
+    const node = document.createElement('span');
+    node.textContent = text;
+    return node.innerHTML;
+  }
 
   function setStatus(html, kind) {
     status.className = 'status is-visible' + (kind ? ' is-' + kind : '');
@@ -457,6 +467,7 @@
       }
 
       const blob = await response.blob();
+      const email = response.headers.get('X-Memo-Email') || '';
       const disposition = response.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
       const name = match ? match[1] : 'memo.pdf';
@@ -470,7 +481,13 @@
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      setStatus('Done — <b>' + name + '</b> has been downloaded.', 'done');
+      let note = '';
+      if (email.startsWith('sent: ')) {
+        note = '<br>A copy has been emailed to <b>' + esc(email.slice(6)) + '</b>.';
+      } else if (email.startsWith('failed: ')) {
+        note = '<br>The email copy could not be sent: ' + esc(email.slice(8));
+      }
+      setStatus('Done — <b>' + name + '</b> has been downloaded.' + note, 'done');
     } catch (err) {
       setStatus('Network error: ' + err.message, 'error');
     } finally {

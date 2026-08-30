@@ -6,6 +6,7 @@ from pathlib import Path
 
 import extractor
 import layout
+import notifier
 import parser as deck_parser
 import template
 import writer
@@ -28,6 +29,12 @@ def build_arg_parser():
         "--output",
         help="Path for the generated memo PDF "
              "(default: output/<input_stem>_memo.pdf)",
+    )
+    ap.add_argument(
+        "--no-email",
+        action="store_true",
+        help="Skip the Resend notification that is otherwise sent to "
+             f"{notifier.DEFAULT_RECIPIENTS} on success",
     )
     return ap
 
@@ -127,6 +134,35 @@ def main(argv=None):
         fail(f"PDF rendering failed ({type(exc).__name__}): {exc}")
 
     print(f"Memo written to {written}")
+
+    # Best-effort: the PDF exists and the tokens are spent, so a failed
+    # notification is reported but never changes the exit code.
+    if args.no_email:
+        print("Email notification skipped (--no-email).")
+    elif not notifier.is_configured():
+        print(
+            "Note: no email sent — RESEND_API_KEY is not set.",
+            file=sys.stderr,
+        )
+    else:
+        try:
+            message_id = notifier.send_memo_email(
+                pdf_bytes=Path(written).read_bytes(),
+                pdf_filename=Path(written).name,
+                company_name=header_title,
+                tagline=header_subtitle,
+                sections=sections,
+                structured_data=data,
+                source_filename=input_path.name,
+                origin="CLI",
+            )
+            print(
+                f"Emailed to {', '.join(notifier.recipients())} "
+                f"(id {message_id})"
+            )
+        except notifier.EmailSendError as exc:
+            print(f"Note: memo email not sent — {exc}", file=sys.stderr)
+
     return 0
 
 

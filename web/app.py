@@ -13,12 +13,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import (
+    Flask, jsonify, render_template, request, send_file, send_from_directory,
+)
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 import extractor
 import layout
+import notifier
 import parser as deck_parser
 import template
 import writer
@@ -42,6 +45,15 @@ def index():
         "index.html",
         accepted=",".join(deck_parser.SUPPORTED_EXTENSIONS),
         max_mb=MAX_UPLOAD_MB,
+        email_to=", ".join(notifier.recipients()) if notifier.is_configured() else "",
+    )
+
+
+@app.get("/favicon.ico")
+def favicon():
+    """Browsers request /favicon.ico at the root regardless of the link tags."""
+    return send_from_directory(
+        app.static_folder, "favicon.ico", mimetype="image/x-icon"
     )
 
 
@@ -54,6 +66,8 @@ def healthz():
         fonts_ready=_fonts_ready(),
         model=extractor.MODEL,
         accepted=list(deck_parser.SUPPORTED_EXTENSIONS),
+        email_configured=notifier.is_configured(),
+        email_to=notifier.recipients(),
     )
 
 
@@ -117,12 +131,15 @@ def generate():
         else:
             sections = template.order_sections(sections)
 
+        company_name = data.get(template.HEADER_FIELDS["title"]) or ""
+        tagline = data.get(template.HEADER_FIELDS["subtitle"]) or ""
+
         output = Path(workdir) / f"{Path(filename).stem}_memo.pdf"
         try:
             writer.build_pdf(
                 output,
-                company_name=data.get(template.HEADER_FIELDS["title"]) or "",
-                tagline=data.get(template.HEADER_FIELDS["subtitle"]) or "",
+                company_name=company_name,
+                tagline=tagline,
                 sections=sections,
             )
         except layout.FontsNotFoundError as exc:
@@ -136,12 +153,52 @@ def generate():
         pdf_bytes = output.read_bytes()
         download_name = output.name
 
-    return send_file(
+    # Best-effort: the memo is already rendered, so a notification failure is
+    # logged and reported in a header rather than failing the download.
+    email_status = _notify(
+        pdf_bytes, download_name, company_name, tagline, sections, data, filename
+    )
+
+    response = send_file(
         io.BytesIO(pdf_bytes),
         mimetype="application/pdf",
         as_attachment=True,
         download_name=download_name,
     )
+    response.headers["X-Memo-Email"] = email_status
+    return response
+
+
+def _notify(pdf_bytes, download_name, company_name, tagline, sections, data,
+            source_filename):
+    """Send the memo email. Returns a short status string for the client."""
+    if not notifier.is_configured():
+        app.logger.warning("RESEND_API_KEY not set; memo email skipped.")
+        return "skipped: RESEND_API_KEY not set"
+
+    try:
+        notifier.send_memo_email(
+            pdf_bytes=pdf_bytes,
+            pdf_filename=download_name,
+            company_name=company_name,
+            tagline=tagline,
+            sections=sections,
+            structured_data=data,
+            source_filename=source_filename,
+            origin="Web app",
+        )
+    except notifier.EmailSendError as exc:
+        app.logger.error("Memo email failed: %s", exc)
+        return _header_safe(f"failed: {exc}")
+
+    recipients = ", ".join(notifier.recipients())
+    app.logger.info("Memo emailed to %s", recipients)
+    return _header_safe(f"sent: {recipients}")
+
+
+def _header_safe(text):
+    """HTTP headers are latin-1; upstream error text may not be."""
+    return text.encode("ascii", "replace").decode("ascii")
 
 
 @app.errorhandler(RequestEntityTooLarge)
