@@ -1,4 +1,4 @@
-"""CLI entry point: pitch deck (PDF/PPTX) -> one-page TEN Capital memo PDF."""
+"""CLI entry point: pitch deck (PDF/PPTX/DOCX) -> TEN Capital investment memo PDF."""
 
 import argparse
 import sys
@@ -18,7 +18,7 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "output"
 def build_arg_parser():
     ap = argparse.ArgumentParser(
         prog="main.py",
-        description="Generate a one-page TEN Capital investment memo from a pitch deck.",
+        description="Generate a TEN Capital investment memo from a pitch deck.",
     )
     ap.add_argument(
         "--input",
@@ -121,12 +121,15 @@ def main(argv=None):
     header_title = data.get(template.HEADER_FIELDS["title"]) or ""
     header_subtitle = data.get(template.HEADER_FIELDS["subtitle"]) or ""
 
+    meta_lines = template.header_meta_lines(data)
+
     try:
         written = writer.build_pdf(
             output_path,
             company_name=header_title,
             tagline=header_subtitle,
             sections=sections,
+            meta_lines=meta_lines,
         )
     except layout.FontsNotFoundError as exc:
         fail(str(exc))
@@ -151,7 +154,7 @@ def main(argv=None):
                 pdf_filename=Path(written).name,
                 company_name=header_title,
                 tagline=header_subtitle,
-                sections=sections,
+                sections=writer.sections_as_text(sections),
                 structured_data=data,
                 source_filename=input_path.name,
                 origin="CLI",

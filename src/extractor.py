@@ -14,8 +14,10 @@ load_dotenv()
 # if you want a newer model (e.g. claude-opus-5).
 MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-5")
 
-EXTRACTION_MAX_TOKENS = 2000
-WRITING_MAX_TOKENS = 3000
+# The memo runs to roughly 2,000 words across fifteen sections, so the writing
+# call needs far more headroom than a one-pager did.
+EXTRACTION_MAX_TOKENS = 4000
+WRITING_MAX_TOKENS = 12000
 
 # The schema block and the section list are generated from template.py so the
 # document structure has one definition. The rendered prompts are unchanged.
@@ -34,7 +36,7 @@ EXTRACTION_PROMPT = _EXTRACTION_PROMPT_TEMPLATE.replace(
 
 _WRITING_PROMPT_TEMPLATE = """You are an investment memo writer for TEN Capital.
 
-Write a one-page investment memo using the structured data below. Follow these rules exactly:
+Write a full investment memo using the structured data below. Follow these rules exactly:
 
 TONE & VOICE
 - Write like a real investor explaining their thinking to another partner
@@ -43,36 +45,48 @@ TONE & VOICE
 - Vary sentence length to sound natural
 - Never sound like AI, consulting jargon, or sales copy
 - Short paragraphs (2–4 lines max); no dense text blocks
-- If something is unclear from the data, say so plainly: "This section is unclear because…"
+- Bullets are single lines, not mini-paragraphs
 
-SECTIONS TO INCLUDE (only include a section if there is real content for it)
-Write each section header in ALL CAPS followed by a colon, then the body paragraph.
-Use only the sections that apply:
+EVIDENCE DISCIPLINE
+- The structured data comes from the company's own deck. Facts in it are the company's claims, not verified truth
+- Never invent a number, date, name, or citation that is not in the data
+- Where the deck gives no basis for a figure, say the figure is assumed rather than sourced
+- Where a section has no support in the data, write one line saying what is missing and why it matters, rather than padding
+- Sections 12 to 15 are your analysis, not the deck's — form a view and commit to it
+
+DOCUMENT OUTLINE
+Write the sections below, in this order, using these exact headings. Omit a
+section only if the data supports nothing in it at all.
 
 {sections}
 
 FORMAT
-Start every section with its header in ALL CAPS on its own line, followed by a
-colon, then the body beneath it. Exactly like this:
+Section headings use two hashes and their number. Subsection headings use three
+hashes. Bulleted lines start with "- ". Exactly like this:
 
-EXECUTIVE SUMMARY:
-First paragraph of the summary.
+## 1. EXECUTIVE SUMMARY
+### Company Snapshot
+First paragraph of the snapshot.
 
 Second paragraph if the section needs one.
 
-WHAT WORKS:
-First paragraph.
+### Deal Terms Summary
+- Round: common equity or convertible note
+- Pre-money valuation: $50 million
 
-Do not bold the headers, do not prefix them with #, and do not number them.
-Do not write any preamble before the first header.
+Where a line carries a label, write it as "Label: value" — the renderer sets the
+label in bold.
+
+Do not write any preamble before the first heading. Do not add sections that are
+not in the outline. Do not restate a heading inside its own body.
 
 RULES
-- Output plain text only — no markdown, no asterisks, no bullet symbols, no em-dashes for decoration
+- No markdown beyond the ## / ### headings and "- " bullets — no bold, no italics, no tables
 - No citations, no footnotes, no meta-commentary
 - No emojis
 - Do not explain your process
 - The output will be rendered into a PDF — write for print, not for a chat window
-- Target length: enough to fill one page at 9pt Inter with 1-inch margins
+- Target length: roughly 1,800–2,400 words across the whole memo
 
 Structured data:
 {json_data}"""

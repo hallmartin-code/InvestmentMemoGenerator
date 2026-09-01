@@ -1,4 +1,4 @@
-"""Flask front end: upload a deck, get the one-pager PDF back.
+"""Flask front end: upload a deck, get the investment memo PDF back.
 
 Wraps the same pipeline the CLI uses (parser -> extractor -> writer). Run
 locally with `python web/app.py`; in production gunicorn serves `app:app`.
@@ -141,6 +141,7 @@ def generate():
                 company_name=company_name,
                 tagline=tagline,
                 sections=sections,
+                meta_lines=template.header_meta_lines(data),
             )
         except layout.FontsNotFoundError as exc:
             return jsonify(error=str(exc)), 500
@@ -156,7 +157,8 @@ def generate():
     # Best-effort: the memo is already rendered, so a notification failure is
     # logged and reported in a header rather than failing the download.
     email_status = _notify(
-        pdf_bytes, download_name, company_name, tagline, sections, data, filename
+        pdf_bytes, download_name, company_name, tagline,
+        writer.sections_as_text(sections), data, filename,
     )
 
     response = send_file(

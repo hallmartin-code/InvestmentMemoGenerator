@@ -1,4 +1,17 @@
-"""ReportLab renderer: memo text -> formatted one-page PDF."""
+"""ReportLab renderer: memo text -> formatted multi-page PDF.
+
+The memo arrives as text with two heading levels and bulleted bodies. Parsing
+turns it into
+
+    [{"name": "PROBLEM STATEMENT", "blocks": [
+        {"kind": "sub",    "text": "Who Experiences the Problem"},
+        {"kind": "para",   "text": "..."},
+        {"kind": "bullet", "text": "..."},
+    ]}, ...]
+
+and rendering walks that structure. Detection is deliberately tolerant, because
+models vary the surface form of a heading far more than they vary its wording.
+"""
 
 import re
 from pathlib import Path
@@ -19,21 +32,30 @@ import brand
 import layout
 import template
 
-# Header detection has to survive the surface forms models actually emit: with
-# or without a trailing colon, wrapped in **bold**, prefixed with ##, or in
-# title case. The trailing colon in particular is dropped often enough that
-# requiring it left nothing to render.
-_MD_HEADING_RE = re.compile(r"^\s*#{1,6}\s*")
-_BULLET_RE = re.compile(r"^\s*[-*•]\s+")
+# Heading detection has to survive the surface forms models actually emit: with
+# or without a trailing colon, wrapped in **bold**, prefixed with ##, numbered,
+# or in title case.
+_MD_HEADING_RE = re.compile(r"^\s*(#{1,6})\s*")
+_BULLET_RE = re.compile(r"^\s*[-*•·]\s+")
 _MD_EMPHASIS_RE = re.compile(r"\*\*|__|\*")
 
-# Fallback for a header the template does not define. Deliberately strict: an
-# all-caps line, no sentence punctuation, and either multi-word or long enough
-# that it cannot be a stray label like "ARR:" at the head of a body line.
+# Fallback for a section heading the template does not define. Deliberately
+# strict: an all-caps line, no sentence punctuation, and either multi-word or
+# long enough that it cannot be a stray label like "ARR:" at the head of a line.
 _GENERIC_HEADER_RE = re.compile(r"^[A-Z][A-Z0-9 &'’/()\-\.,]{1,59}$")
 
+# "Round: common equity" — a short leading label, set bold in the reference.
+# Capped in length so a full sentence containing a colon is not mistaken for one.
+_LABEL_RE = re.compile(r"^([A-Z][^:]{0,44}?):\s+(\S.*)$")
 
-def _looks_like_header(text):
+BULLET_CHAR = "•"
+
+
+def _strip_markup(text):
+    return _MD_EMPHASIS_RE.sub("", text).strip()
+
+
+def _looks_like_section(text):
     text = text.strip()
     if not _GENERIC_HEADER_RE.match(text):
         return False
@@ -42,65 +64,106 @@ def _looks_like_header(text):
     return " " in text or len(text) >= 8
 
 
-def _split_header(line):
-    """Return (header, inline_body) if `line` starts a section, else None."""
-    stripped = _MD_HEADING_RE.sub("", line.strip())
-    stripped = _BULLET_RE.sub("", stripped)
-    stripped = _MD_EMPHASIS_RE.sub("", stripped).strip()
-    if not stripped:
-        return None
+def _classify(line):
+    """Return (kind, text) for one line.
 
-    # "HEADER: body on the same line"
-    head, separator, tail = stripped.partition(":")
-    if separator:
-        canonical = template.match_section_name(head)
-        if canonical:
-            return canonical, tail.strip()
-        if _looks_like_header(head):
-            return head.strip(), tail.strip()
-        # A colon mid-sentence is not a section break.
-        return None
+    kind is "section", "sub", "bullet", or "text".
+    """
+    raw = line.strip()
+    if not raw:
+        return None, ""
 
-    canonical = template.match_section_name(stripped)
+    heading = _MD_HEADING_RE.match(raw)
+    hashes = len(heading.group(1)) if heading else 0
+    body = _strip_markup(_MD_HEADING_RE.sub("", raw))
+    if not body:
+        return None, ""
+
+    # An explicit markdown level wins outright: ### and deeper is a subsection,
+    # ## and shallower is a section.
+    if hashes:
+        body = re.sub(r"[\s:]+$", "", body)
+        if hashes >= 3:
+            return "sub", template.match_subsection_name(body) or body
+        return "section", template.match_section_name(body) or body
+
+    if _BULLET_RE.match(raw):
+        return "bullet", _strip_markup(_BULLET_RE.sub("", raw))
+
+    # Unprefixed: match against the template before falling back to shape.
+    candidate = re.sub(r"[\s:]+$", "", body)
+    canonical = template.match_section_name(candidate)
     if canonical:
-        return canonical, ""
-    if _looks_like_header(stripped):
-        return stripped, ""
-    return None
+        return "section", canonical
+    canonical = template.match_subsection_name(candidate)
+    if canonical:
+        return "sub", canonical
+
+    # A heading-shaped line with no body after the colon is still a heading;
+    # "LABEL: value" is not.
+    head, separator, tail = candidate.partition(":")
+    if separator and tail.strip():
+        return "text", body
+    if _looks_like_section(head):
+        return "section", head.strip()
+
+    return "text", body
 
 
 def parse_memo_sections(memo_text):
-    """Split raw memo text into [(section_name, body_text), ...].
+    """Split raw memo text into the section/block structure described above.
 
-    Anything before the first header is dropped — the model is instructed to
-    open with a section header, and a stray preamble does not belong in print.
+    Anything before the first section heading is dropped — the model is told to
+    open with one, and a stray preamble does not belong in print.
     """
     sections = []
-    current_name = None
-    current_lines = []
+    current = None
+    paragraph_lines = []
+
+    def flush_paragraph():
+        if paragraph_lines and current is not None:
+            joined = " ".join(paragraph_lines).strip()
+            if joined:
+                current["blocks"].append({"kind": "para", "text": joined})
+        paragraph_lines.clear()
 
     for line in memo_text.splitlines():
-        header = _split_header(line)
-        if header is not None:
-            if current_name is not None:
-                sections.append((current_name, "\n".join(current_lines).strip()))
-            current_name, inline_body = header
-            current_lines = [inline_body] if inline_body else []
-        elif current_name is not None:
-            current_lines.append(line.strip())
+        kind, text = _classify(line)
 
-    if current_name is not None:
-        sections.append((current_name, "\n".join(current_lines).strip()))
+        if kind is None:            # blank line ends a paragraph
+            flush_paragraph()
+            continue
 
-    return [(name, body) for name, body in sections if body]
+        if kind == "section":
+            flush_paragraph()
+            current = {"name": text, "blocks": []}
+            sections.append(current)
+            continue
+
+        if current is None:
+            continue
+
+        if kind == "sub":
+            flush_paragraph()
+            current["blocks"].append({"kind": "sub", "text": text})
+        elif kind == "bullet":
+            flush_paragraph()
+            current["blocks"].append({"kind": "bullet", "text": text})
+        else:
+            paragraph_lines.append(text)
+
+    flush_paragraph()
+
+    # A heading with nothing under it is noise, not a section.
+    return [s for s in sections if any(b["kind"] != "sub" for b in s["blocks"])]
 
 
 def sections_or_fallback(memo_text):
     """Parse sections, falling back to one untitled block.
 
-    Returns (sections, degraded). If Claude ignored the header format entirely
+    Returns (sections, degraded). If Claude ignored the heading format entirely
     the prose is still worth rendering — the tokens are already spent and a
-    memo without headers beats no memo at all.
+    memo without headings beats no memo at all.
     """
     sections = parse_memo_sections(memo_text)
     if sections:
@@ -109,7 +172,34 @@ def sections_or_fallback(memo_text):
     body = (memo_text or "").strip()
     if not body:
         return [], False
-    return [("", body)], True
+
+    blocks = [
+        {"kind": "para", "text": re.sub(r"\s*\n\s*", " ", block).strip()}
+        for block in re.split(r"\n\s*\n", body)
+        if block.strip()
+    ]
+    return [{"name": "", "blocks": blocks}], True
+
+
+def sections_as_text(sections):
+    """Flatten to [(section_name, plain_text), ...] for the email body."""
+    flattened = []
+    for section in sections:
+        lines = []
+        for block in section["blocks"]:
+            if block["kind"] == "sub":
+                lines.append("")
+                lines.append(f"{block['text']}")
+            elif block["kind"] == "bullet":
+                lines.append(f"  - {block['text']}")
+            else:
+                lines.append("")
+                lines.append(block["text"])
+        text = "\n".join(lines).strip()
+        if text:
+            flattened.append((template.numbered_heading(section["name"])
+                              if section["name"] else "", text))
+    return flattened
 
 
 def _clean(text):
@@ -120,10 +210,13 @@ def _clean(text):
     return escape(text.strip())
 
 
-def _paragraphs(body_text):
-    """Split a section body into paragraphs on blank lines."""
-    blocks = re.split(r"\n\s*\n", body_text)
-    return [re.sub(r"\s*\n\s*", " ", b).strip() for b in blocks if b.strip()]
+def _with_label(text):
+    """Bold a leading "Label:" the way the reference memo does."""
+    match = _LABEL_RE.match(text.strip())
+    if not match:
+        return _clean(text)
+    label, rest = match.groups()
+    return f"<b>{_clean(label)}:</b> {_clean(rest)}"
 
 
 def _draw_footer(canvas, doc):
@@ -196,8 +289,79 @@ class NumberedCanvas(pdfcanvas.Canvas):
         )
 
 
-def build_pdf(output_path, company_name, tagline, sections):
-    """Render the memo to a PDF at output_path."""
+def _header_story(styles, company_name, tagline, meta_lines):
+    """Title, tagline, and the two bold-labelled metadata blocks."""
+    story = []
+    if company_name:
+        title = f"{company_name} {template.TITLE_SUFFIX}"
+        story.append(Paragraph(_clean(title), styles["TITLE"]))
+    if tagline:
+        story.append(Spacer(1, 2))
+        story.append(Paragraph(_clean(tagline), styles["TAGLINE"]))
+
+    for index, group in enumerate(meta_lines):
+        if not group:
+            continue
+        story.append(Spacer(1, layout.GAP_AFTER_META_BLOCK if index else
+                            layout.GAP_AFTER_TITLE_BLOCK))
+        for label, value in group:
+            story.append(
+                Paragraph(
+                    f"<b>{_clean(label)}:</b> {_clean(value)}", styles["META"]
+                )
+            )
+    return story
+
+
+def _section_story(section, styles):
+    """Flowables for one section, in document order."""
+    story = []
+    name = section["name"]
+    if name:
+        # No Spacer after a heading — the style's spaceAfter does that job, and
+        # a Spacer here would satisfy keepWithNext and strand the heading.
+        story.append(
+            Paragraph(
+                _clean(template.numbered_heading(name)), styles["SECTION_HEADER"]
+            )
+        )
+
+    previous = None
+    for block in section["blocks"]:
+        kind = block["kind"]
+
+        if kind == "sub":
+            story.append(
+                Paragraph(_clean(block["text"]), styles["SUBSECTION_HEADER"])
+            )
+        elif kind == "bullet":
+            # A list opening straight after a heading already has that
+            # heading's spaceAfter beneath it.
+            if previous == "para":
+                story.append(Spacer(1, layout.GAP_AROUND_LIST))
+            story.append(
+                Paragraph(
+                    _with_label(block["text"]),
+                    styles["BULLET"],
+                    bulletText=BULLET_CHAR,
+                )
+            )
+        else:
+            if previous == "bullet":
+                story.append(Spacer(1, layout.GAP_AROUND_LIST))
+            story.append(Paragraph(_with_label(block["text"]), styles["BODY"]))
+
+        previous = kind
+
+    return story
+
+
+def build_pdf(output_path, company_name, tagline, sections, meta_lines=()):
+    """Render the memo to a PDF at output_path.
+
+    meta_lines is a sequence of groups, each a list of (label, value) pairs,
+    rendered as the bold-labelled header blocks beneath the title.
+    """
     layout.register_fonts()
     styles = layout.build_styles()
 
@@ -214,6 +378,7 @@ def build_pdf(output_path, company_name, tagline, sections):
         title=f"{company_name} — Investment Memo" if company_name else "Investment Memo",
         author="TEN Capital",
     )
+
     def _frame(height, frame_id):
         return Frame(
             doc.leftMargin,
@@ -244,32 +409,20 @@ def build_pdf(output_path, company_name, tagline, sections):
     ])
 
     story = [NextPageTemplate("later")]
-
-    if company_name:
-        story.append(Paragraph(_clean(company_name), styles["TITLE"]))
-    if tagline:
-        story.append(Spacer(1, 1))
-        story.append(Paragraph(_clean(tagline), styles["TAGLINE"]))
-    if company_name or tagline:
-        story.append(Spacer(1, layout.GAP_AFTER_TITLE_BLOCK))
+    story.extend(_header_story(styles, company_name, tagline, meta_lines))
 
     rendered = 0
-    for section_name, body_text in sections:
-        if not body_text:
+    for section in sections:
+        if not any(b["kind"] != "sub" for b in section["blocks"]):
             continue
-        # An empty name is the untitled fallback block — render body only.
-        if section_name:
-            story.append(
-                Paragraph(_clean(section_name.upper()), styles["SECTION_HEADER"])
-            )
-            story.append(Spacer(1, layout.GAP_AFTER_HEADER))
-        for paragraph in _paragraphs(body_text):
-            story.append(Paragraph(_clean(paragraph), styles["BODY"]))
-        story.append(Spacer(1, layout.GAP_AFTER_SECTION))
+        story.extend(_section_story(section, styles))
         rendered += 1
 
     if rendered == 0:
         raise ValueError("Nothing to render: the memo contained no sections.")
+
+    story.append(Spacer(1, layout.GAP_BEFORE_SECTION))
+    story.append(Paragraph(_clean(template.CLOSING_LINE), styles["CLOSING"]))
 
     doc.build(story, canvasmaker=NumberedCanvas)
     return output_path

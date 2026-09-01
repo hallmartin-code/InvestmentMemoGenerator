@@ -33,6 +33,7 @@ INK_600 = HexColor("#5C6E86")
 # Print roles
 TEXT_COLOR = NAVY_900          # body copy
 HEADING_COLOR = NAVY_950       # company name, section headers
+SUBHEADING_COLOR = NAVY_700    # subsection headings, a step down from sections
 MUTED_COLOR = INK_600          # tagline, secondary copy
 RULE_COLOR = INK_300           # hairlines
 FOOTER_COLOR = INK_600
@@ -46,12 +47,14 @@ FONT_FILES = {
     "Sora-Bold": "Sora-Bold.ttf",
     "Sora-SemiBold": "Sora-SemiBold.ttf",
     "Inter-Regular": "Inter-Regular.ttf",
+    "Inter-SemiBold": "Inter-SemiBold.ttf",
     "JetBrainsMono-Medium": "JetBrainsMono-Medium.ttf",
 }
 
 FONT_HEADING = "Sora-Bold"
 FONT_SUBHEADING = "Sora-SemiBold"
 FONT_BODY = "Inter-Regular"
+FONT_BODY_BOLD = "Inter-SemiBold"   # inline labels, e.g. "Round: common equity"
 FONT_MONO = "JetBrainsMono-Medium"
 
 FONT_INSTALL_INSTRUCTIONS = """The TEN Capital brand fonts are Sora, Inter, and JetBrains Mono.
@@ -66,6 +69,7 @@ fonts/ with these exact names:
     Sora-Bold.ttf                https://fonts.google.com/specimen/Sora
     Sora-SemiBold.ttf            https://fonts.google.com/specimen/Sora
     Inter-Regular.ttf            https://fonts.google.com/specimen/Inter
+    Inter-SemiBold.ttf           https://fonts.google.com/specimen/Inter
     JetBrainsMono-Medium.ttf     https://fonts.google.com/specimen/JetBrains+Mono
 
 Sora and Inter download as variable fonts, which ReportLab cannot read — use

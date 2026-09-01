@@ -17,6 +17,7 @@ python tools/fetch_brand_fonts.py
 | `Sora-Bold.ttf` | Sora 700 | https://fonts.google.com/specimen/Sora |
 | `Sora-SemiBold.ttf` | Sora 600 | https://fonts.google.com/specimen/Sora |
 | `Inter-Regular.ttf` | Inter 400 | https://fonts.google.com/specimen/Inter |
+| `Inter-SemiBold.ttf` | Inter 600 | https://fonts.google.com/specimen/Inter |
 | `JetBrainsMono-Medium.ttf` | JetBrains Mono 500 | https://fonts.google.com/specimen/JetBrains+Mono |
 
 Sora and Inter download from Google Fonts as **variable** fonts

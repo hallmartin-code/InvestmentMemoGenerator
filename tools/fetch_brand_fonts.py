@@ -38,6 +38,8 @@ VARIABLE_SOURCES = [
         f"{GOOGLE_FONTS}/inter/Inter%5Bopsz,wght%5D.ttf",
         [
             ({"opsz": 14, "wght": 400}, "Inter-Regular.ttf"),
+            # Bold labels inside body text ("Round: common equity").
+            ({"opsz": 14, "wght": 600}, "Inter-SemiBold.ttf"),
         ],
     ),
 ]

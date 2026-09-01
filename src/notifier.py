@@ -46,7 +46,8 @@ _TEAL = "#35BEBB"
 _INK = "#5C6E86"
 
 # Structured-data fields surfaced in the email summary table, in order.
-_SUMMARY_FIELDS = ["stage", "ask", "market", "traction"]
+_SUMMARY_FIELDS = ["sector", "stage", "deal_stage", "proposed_investment",
+                   "valuation"]
 
 
 class EmailSendError(Exception):
